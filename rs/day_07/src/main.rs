@@ -1,3 +1,4 @@
+use num::abs;
 use regex::Regex;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -121,6 +122,33 @@ fn handle_cmd(sys: &mut System, cmd: &str) {
     }
 }
 
+fn part2(sys: &System) -> u64 {
+    let MAX_SPACE_AVAILABLE = 70000000;
+    let SPACE_NEEDED_FOR_UPDATE = 30000000;
+    let current_size_of_sys = sys.root.get_size();
+    let size_needed_still = SPACE_NEEDED_FOR_UPDATE - (MAX_SPACE_AVAILABLE - current_size_of_sys);
+
+    println!("target: {}", size_needed_still);
+    find_closest_size_to_target(&sys.root.subdirectories, size_needed_still, current_size_of_sys)
+}
+
+fn find_closest_size_to_target(directories: &Vec<Directory>, target: u64, closest: u64) -> u64 {
+    let mut closest = closest;
+    for dir in directories {
+        let dir_size = dir.get_size();
+        // println!("checking dir {} with size {}", dir.name, dir_size);
+        let a = dir_size as i64 - target as i64;
+        let b = closest as i64 - target as i64;
+        // println!("a: {}, b: {}", a, b);
+        if (dir_size > target) &&  a < b {
+            closest = dir_size;
+            // println!("found new closest dir {} with size {}", dir.name, closest)
+        }
+        closest = find_closest_size_to_target(&dir.subdirectories, target, closest);
+    }
+    closest
+}
+
 fn main() {
     let mut sys = System::new();
     let file = File::open("input.txt").unwrap();
@@ -131,6 +159,9 @@ fn main() {
         handle_cmd(&mut sys, &line);
     }
 
-    let p1 = part1(&sys.root.subdirectories, 0);
-    println!("Part 1: {}", p1)
+    // let p1 = part1(&sys.root.subdirectories, 0);
+    // println!("Part 1: {}", p1)
+
+    let p2 = part2(&sys);
+    println!("Part 2: {}", p2)
 }
