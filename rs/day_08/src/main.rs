@@ -101,6 +101,95 @@ impl Map {
     fn total_visible_trees(&self) -> i64 {
         self.calculate_trees_from_edges() + self.calculate_interior_trees()
     }
+
+    fn visible_trees_from_top(&self, x: i64, y: i64) -> i64 {
+        let mut x = x as usize;
+        let y = y as usize;
+        let tree_height = self.grid[x][y];
+        let mut visible_trees = 0;
+        while x > 0 {
+            visible_trees += 1;
+            if self.grid[x - 1][y] >= tree_height {
+                break;
+            }
+            x -= 1;
+        }
+
+        return visible_trees;
+    }
+
+    fn visible_trees_from_right(&self, x: i64, y: i64) -> i64 {
+        let x = x as usize;
+        let mut y = y as usize;
+        let tree_height = self.grid[x][y];
+        let mut visible_trees = 0;
+        while y < self.num_cols() as usize - 1 {
+            visible_trees += 1;
+            if self.grid[x][y + 1] >= tree_height {
+                break;
+            }
+            y += 1;
+        }
+
+        return visible_trees;
+    }
+
+    fn visible_trees_from_bottom(&self, x: i64, y: i64) -> i64 {
+        let mut x = x as usize;
+        let y = y as usize;
+        let tree_height = self.grid[x][y];
+        let mut visible_trees = 0;
+        while x < self.num_rows() as usize - 1 {
+            visible_trees += 1;
+            if self.grid[x + 1][y] >= tree_height {
+                break;
+            }
+            x += 1;
+        }
+
+        return visible_trees;
+    }
+
+    fn visible_trees_from_left(&self, x: i64, y: i64) -> i64 {
+        let x = x as usize;
+        let mut y = y as usize;
+        let tree_height = self.grid[x][y];
+        let mut visible_trees = 0;
+        while y > 0 {
+            visible_trees += 1;
+            if self.grid[x][y - 1] >= tree_height {
+                break;
+            }
+            y -= 1;
+        }
+
+        return visible_trees;
+    }
+
+    fn find_highest_tree_score(&self) -> i64 {
+        let starting_x = 1;
+        let starting_y = 1;
+        let ending_x = self.num_rows() - 1;
+        let ending_y = self.num_cols() - 1;
+        let mut highest_tree_score = 0;
+        for x in starting_x..ending_x {
+            for y in starting_y..ending_y {
+                let tree_score = self.calculate_tree_score(x, y);
+                if tree_score > highest_tree_score {
+                    highest_tree_score = tree_score;
+                }
+            }
+        }
+
+        return highest_tree_score;
+    }
+
+    fn calculate_tree_score(&self, x: i64, y: i64) -> i64 {
+        self.visible_trees_from_top(x, y) *
+        self.visible_trees_from_right(x, y) *
+        self.visible_trees_from_bottom(x, y) *
+        self.visible_trees_from_left(x, y)
+    }
 }
 
 fn main() {
@@ -115,5 +204,6 @@ fn main() {
         map.add_row(digits);
     }
 
-    println!("Total visible trees: {}", map.total_visible_trees());
+    // println!("Total visible trees: {}", map.total_visible_trees());
+    println!("Highest tree score: {}", map.find_highest_tree_score());
 }
