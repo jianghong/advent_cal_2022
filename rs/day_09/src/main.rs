@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::{BufReader, BufRead};
 
 #[derive(Debug)]
@@ -28,6 +29,32 @@ impl Rope {
             });
             self.head = Some(new_segment);
         }
+    }
+}
+
+impl fmt::Display for Rope {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // create 100x100 grid of "." char
+        let offset_x = 20;
+        let offset_y = 80;
+        let mut grid = vec![vec![".".to_string(); 100]; 100];
+
+        let mut curr_segment = self.head.as_ref().unwrap();
+        grid[(curr_segment.pos.y + offset_y) as usize][(curr_segment.pos.x + offset_x) as usize] = "H".to_string();
+        let mut id = 1;
+        while curr_segment.next.is_some() {
+            curr_segment = curr_segment.next.as_ref().unwrap();
+            grid[(curr_segment.pos.y + offset_y) as usize][(curr_segment.pos.x + offset_x) as usize] = id.to_string();
+            id += 1;
+        }
+        grid[offset_y as usize][offset_x as usize] = "S".to_string();
+        for row in grid {
+            for c in row {
+                write!(f, "{}", c)?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
     }
 }
 
@@ -62,6 +89,7 @@ impl KnotTracker {
             "D" => self.move_head_down(rope, steps),
             _ => panic!("Invalid direction"),
         }
+        // println!("head pos: {:?}", rope.head.as_ref().unwrap().pos);
     }
 
     fn move_head_right(&mut self, rope: &mut Rope, steps: i64) {
@@ -169,6 +197,7 @@ fn main() {
         knot_tracker.move_head(&mut rope, direction, steps);
     }
 
-    println!("{:?}", rope);
-    println!("num of known tail positions {:?}", knot_tracker.known_tail_positions.len());
+    println!("{}", rope);
+    // println!("num of known tail positions {:?}", knot_tracker.known_tail_positions.len());
+    // println!("known tail positions {:?}", knot_tracker.known_tail_positions);
 }
