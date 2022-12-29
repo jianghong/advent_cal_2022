@@ -5,24 +5,27 @@ struct Register {
     value: i64
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 enum InstructionType {
     NOOP,
     ADDX
 }
 
+#[derive(Debug)]
 struct Instruction {
     instruction_type: InstructionType,
-    operand: Option<String>
+    cycles_needed: i64,
+    operand: Option<String>,
 }
 
 impl Instruction {
-    fn new(instruction_type: InstructionType, operand: Option<String>) -> Instruction {
+    fn new(instruction_type: InstructionType, cycles_needed: i64, operand: Option<String>) -> Instruction {
         if instruction_type == InstructionType::ADDX && operand.is_none() {
             panic!("ADDX instruction must have an operand");
         }
         Instruction {
             instruction_type,
+            cycles_needed,
             operand
         }
     }
@@ -31,17 +34,26 @@ impl Instruction {
 struct CPU {
     register_x: Register,
     cycle_count: i64,
+    signal_strength: i64,
+    next_cycle_count_check: i64,
 }
 
 impl CPU {
+    const FINAL_CYCLE_COUNT_CHECK: i64 = 220;
+    const CYCLE_CHECK_INCREMENT: i64 = 40;
+
     fn new() -> CPU {
         CPU {
             register_x: Register { value: 1 },
-            cycle_count: 0
+            cycle_count: 0,
+            signal_strength: 0,
+            next_cycle_count_check: 20
         }
     }
 
     fn handle_instruction(&mut self, instruction: Instruction) {
+        self.cycle_count += instruction.cycles_needed;
+        self.add_signal_strength();
         match instruction.instruction_type {
             InstructionType::NOOP => self.handle_noop(),
             InstructionType::ADDX => self.handle_addx(instruction.operand.unwrap().parse::<i64>().unwrap()),
@@ -49,21 +61,30 @@ impl CPU {
     }
 
     fn handle_noop(&mut self) {
-        self.cycle_count += 1;
     }
 
     fn handle_addx(&mut self, operand: i64) {
         self.register_x.value += operand;
-        self.cycle_count += 2;
+    }
+
+    fn add_signal_strength(&mut self) {
+        if self.next_cycle_count_check > CPU::FINAL_CYCLE_COUNT_CHECK {
+            return
+        }
+
+        if self.cycle_count >= self.next_cycle_count_check {
+            self.signal_strength += self.register_x.value * self.next_cycle_count_check;
+            self.next_cycle_count_check += CPU::CYCLE_CHECK_INCREMENT;
+        }
+        println!("cycle count: {}, next cycle count check: {}, signal strength {}, register x {}", self.cycle_count, self.next_cycle_count_check, self.signal_strength, self.register_x.value);
     }
 
     fn parse_instruction(instruction: String) -> Instruction {
-        // match on "noop" or "addx 5"
         match instruction.as_str() {
-            "noop" => Instruction::new(InstructionType::NOOP, None),
+            "noop" => Instruction::new(InstructionType::NOOP, 1, None),
             addx_instruction if addx_instruction.starts_with("addx") => {
                 let operand = addx_instruction.split(" ").nth(1).unwrap();
-                Instruction::new(InstructionType::ADDX, Some(operand.to_string()))
+                Instruction::new(InstructionType::ADDX, 2, Some(operand.to_string()))
             },
             _ => panic!("Unknown instruction")
         }
@@ -73,12 +94,12 @@ impl CPU {
 
 impl fmt::Display for CPU {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "X: {}, cycles: {}", self.register_x.value, self.cycle_count)
+        write!(f, "X: {}, cycles: {}, signal strength: {}", self.register_x.value, self.cycle_count, self.signal_strength)
     }
 }
 
 fn main() {
-    let file = std::fs::File::open("sample.txt").unwrap();
+    let file = std::fs::File::open("input.txt").unwrap();
     let reader = BufReader::new(file);
     
     let mut cpu = CPU::new();
