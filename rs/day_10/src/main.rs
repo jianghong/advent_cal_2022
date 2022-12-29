@@ -1,4 +1,7 @@
+use std::fs::File;
 use core::fmt;
+use std::iter::Enumerate;
+use std::io::Lines;
 use std::io::{BufRead, BufReader};
 
 struct Register {
@@ -31,52 +34,35 @@ impl Instruction {
     }
 }
 
+struct Job {
+    instruction: Instruction,
+    cycles_done: i64,
+}
+
 struct CPU {
     register_x: Register,
     cycle_count: i64,
-    signal_strength: i64,
-    next_cycle_count_check: i64,
+    render_position: i64,
+    next_line_break_check: i64,
+    instructions: Enumerate<Lines<BufReader<File>>>,
+    current_job: Option<Job>,
 }
 
 impl CPU {
-    const FINAL_CYCLE_COUNT_CHECK: i64 = 220;
-    const CYCLE_CHECK_INCREMENT: i64 = 40;
+    const FINAL_CYCLE: i64 = 240;
+    const LINE_BREAK_INCREMENT: i64 = 40;
 
-    fn new() -> CPU {
+    fn new(instructions_filename: String) -> CPU {
+        let file = File::open(instructions_filename).unwrap();
+        let reader = BufReader::new(file);
         CPU {
             register_x: Register { value: 1 },
-            cycle_count: 0,
-            signal_strength: 0,
-            next_cycle_count_check: 20
+            cycle_count: 1,
+            render_position: 0,
+            next_line_break_check: 40,
+            instructions: reader.lines().enumerate(),
+            current_job: None,
         }
-    }
-
-    fn handle_instruction(&mut self, instruction: Instruction) {
-        self.cycle_count += instruction.cycles_needed;
-        self.add_signal_strength();
-        match instruction.instruction_type {
-            InstructionType::NOOP => self.handle_noop(),
-            InstructionType::ADDX => self.handle_addx(instruction.operand.unwrap().parse::<i64>().unwrap()),
-        }
-    }
-
-    fn handle_noop(&mut self) {
-    }
-
-    fn handle_addx(&mut self, operand: i64) {
-        self.register_x.value += operand;
-    }
-
-    fn add_signal_strength(&mut self) {
-        if self.next_cycle_count_check > CPU::FINAL_CYCLE_COUNT_CHECK {
-            return
-        }
-
-        if self.cycle_count >= self.next_cycle_count_check {
-            self.signal_strength += self.register_x.value * self.next_cycle_count_check;
-            self.next_cycle_count_check += CPU::CYCLE_CHECK_INCREMENT;
-        }
-        println!("cycle count: {}, next cycle count check: {}, signal strength {}, register x {}", self.cycle_count, self.next_cycle_count_check, self.signal_strength, self.register_x.value);
     }
 
     fn parse_instruction(instruction: String) -> Instruction {
@@ -90,25 +76,79 @@ impl CPU {
         }
 
     }
+
+    fn run(&mut self) {
+        while self.cycle_count <= CPU::FINAL_CYCLE {
+            self.queue_instruction();
+            self.render();
+            self.work_on_current_job();
+            self.cycle_count += 1;
+        }
+        println!("");
+    }
+
+    fn work_on_current_job(&mut self) {
+        if let Some(job) = &mut self.current_job {
+            job.cycles_done += 1;
+            if job.cycles_done == job.instruction.cycles_needed {
+                match job.instruction.instruction_type {
+                    InstructionType::NOOP => {},
+                    InstructionType::ADDX => self.register_x.value += job.instruction.operand.as_ref().unwrap().parse::<i64>().unwrap(),
+                }
+                self.current_job = None;
+            }
+        }
+    }
+
+    fn queue_instruction(&mut self) {
+        if self.current_job.is_some() {
+            return;
+        }
+        let next_instruction = self.instructions.next();
+
+        if let Some((_, Ok(line))) = next_instruction {
+            self.queue_job(CPU::parse_instruction(line));
+        }
+    }
+
+    fn queue_job(&mut self, instruction: Instruction) {
+        self.current_job = Some(Job {
+            instruction,
+            cycles_done: 0,
+        });
+    }
+
+    fn render(&mut self) {
+        self.line_break();
+        self.render_sprite();
+    }
+    
+    fn line_break(&mut self) {
+        if self.cycle_count > self.next_line_break_check {
+            println!("");
+            self.next_line_break_check += CPU::LINE_BREAK_INCREMENT;
+        }
+    }
+
+    fn render_sprite(&mut self) {
+        // println!("cycle count: {}, register value: {}", self.cycle_count, self.register_x.value);
+        let sprite_locations = vec![self.register_x.value - 1, self.register_x.value, self.register_x.value + 1];
+        if sprite_locations.contains(&self.render_position) {
+            print!("#");
+        } else {
+            print!(".");
+        }
+        self.render_position = (self.render_position + 1) % CPU::LINE_BREAK_INCREMENT;
+    }
 }
 
 impl fmt::Display for CPU {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "X: {}, cycles: {}, signal strength: {}", self.register_x.value, self.cycle_count, self.signal_strength)
+        write!(f, "X: {}, cycles: {}", self.register_x.value, self.cycle_count)
     }
 }
 
 fn main() {
-    let file = std::fs::File::open("input.txt").unwrap();
-    let reader = BufReader::new(file);
-    
-    let mut cpu = CPU::new();
-
-    for (_, line) in reader.lines().enumerate() {
-        let line = line.unwrap();
-        let instruction = CPU::parse_instruction(line);
-        cpu.handle_instruction(instruction);
-    }
-
-    println!("{}", cpu);
+    let mut cpu = CPU::new("input.txt".to_string());
+    cpu.run();
 }
